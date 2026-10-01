@@ -1,584 +1,393 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { gsap } from 'gsap'
 
 // ==========================================
-// 1. Parámetros Globales y Ajustes Rápidos
+// 1. Configuración de Colores y Escena
 // ==========================================
-const SETTINGS = {
-  colors: {
-    fondo: 0x07050c,
-    base: 0x15101f,
-    morado: 0x4b2a7a,
-    lila: 0x8a5cff,
-    verde: 0x9dff3c,
-    naranja: 0xff6a00,
-    alerta: 0xd7263d
-  },
-  scene: {
-    fogNear: 5,
-    fogFar: 14,
-    floorColor: 0x0b0814
-  },
-  camera: {
-    fov: 60,
-    near: 0.1,
-    far: 100,
-    distance: 5,
-    height: 0.9,
-    introHeight: 1.2,
-    defaultZ: 6.2
-  },
-  renderer: {
-    pixelRatioMax: 2,
-    shadowMap: true,
-    toneMapping: THREE.ACESFilmicToneMapping,
-    toneMappingExposure: 1.3
-  },
-  controls: {
-    targetY: 0.3,
-    damping: true,
-    distanceMin: 3,
-    distanceMax: 8,
-    maxPolarAngle: Math.PI / 2 - 0.05
-  },
-  lighting: {
-    ambientIntensity: 0.55,
-    directionalIntensity: 1.9,
-    pointIntensity: 10,
-    pointDistance: 6,
-    directionalPosition: new THREE.Vector3(3, 5, 3)
-  },
-  motion: {
-    introDuration: 2400,
-    ramielYBase: -0.5,
-    ramielYIntro: 0.45,
-    floatAmplitude: 0.08,
-    alertRotationSpeed: 3,
-    idleRotationSpeed: 1,
-    floatLerp: 1.5,
-    tiltStrength: 0.4,
-    ringScaleStart: 0.01,
-    ringScaleEnd: 1,
-    portalScaleStart: 0.01,
-    portalScaleEnd: 1
-  },
-  interaction: {
-    moveSensitivityX: 0.4,
-    moveSensitivityY: 0.4,
-    raycastObject: 'ramiel',
-    activationKey: 'Space'
-  },
-  objects: {
-    pedestalRadiusTop: 0.9,
-    pedestalRadiusBottom: 1.1,
-    pedestalHeight: 0.4,
-    pedestalY: -0.8,
-    ramielScaleY: 1.5,
-    ringRadiusA: 1.5,
-    ringRadiusB: 2.0,
-    ringRadiusC: 2.5,
-    portalRadius: 2.2,
-    particleCount: 8,
-    nucleusY: 1.5,
-    nucleusScale: 0.18
-  }
+const COLORS = {
+  fondo: 0x07050c,
+  base: 0x15101f,
+  morado: 0x4b2a7a,
+  azul: 0x4aa3ff,
+  lila: 0x8a5cff,
+  verde: 0x9dff3c,
+  naranja: 0xff6a00,
+  alerta: 0xd7263d,
+  suelo: 0x0b0814
 }
 
-const {
-  colors,
-  scene: sceneSettings,
-  camera: cameraSettings,
-  renderer: rendererSettings,
-  controls: controlsSettings,
-  lighting,
-  motion,
-  interaction,
-  objects
-} = SETTINGS
-
-// ==========================================
-// 2. Escena, Cámara, Renderer y Controles
-// ==========================================
 const canvas = document.querySelector('#webgl')
 
-if (!canvas) {
-  throw new Error('No se encontró el canvas #webgl')
-}
-
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(colors.fondo)
-scene.fog = new THREE.Fog(colors.fondo, sceneSettings.fogNear, sceneSettings.fogFar)
+scene.background = new THREE.Color(COLORS.fondo)
+scene.fog = new THREE.Fog(COLORS.fondo, 5, 14)
 
 const camera = new THREE.PerspectiveCamera(
-  cameraSettings.fov,
+  60,
   window.innerWidth / window.innerHeight,
-  cameraSettings.near,
-  cameraSettings.far
+  0.1,
+  100
 )
-camera.position.set(0, cameraSettings.height, cameraSettings.distance)
+camera.position.set(0, 0.9, 5)
 scene.add(camera)
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, rendererSettings.pixelRatioMax))
-renderer.shadowMap.enabled = rendererSettings.shadowMap
-renderer.setClearColor(colors.fondo, 1)
-renderer.outputColorSpace = THREE.SRGBColorSpace
-renderer.toneMapping = rendererSettings.toneMapping
-renderer.toneMappingExposure = rendererSettings.toneMappingExposure
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+renderer.shadowMap.enabled = true
 
 const controls = new OrbitControls(camera, canvas)
-controls.target.set(0, controlsSettings.targetY, 0)
-controls.enableDamping = controlsSettings.damping
-controls.minDistance = controlsSettings.distanceMin
-controls.maxDistance = controlsSettings.distanceMax
-controls.maxPolarAngle = controlsSettings.maxPolarAngle
+controls.target.set(0, 0.3, 0)
+controls.enableDamping = true
+
+// Cargador de Texturas
+const textureLoader = new THREE.TextureLoader()
+
+function createRamielTexture() {
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+
+  const context = canvas.getContext('2d')
+
+  const gradient = context.createLinearGradient(0, 0, size, size)
+  gradient.addColorStop(0, '#e5f4ff')
+  gradient.addColorStop(0.35, '#79bbff')
+  gradient.addColorStop(0.7, '#2e7ef7')
+  gradient.addColorStop(1, '#0d2f7a')
+  context.fillStyle = gradient
+  context.fillRect(0, 0, size, size)
+
+  for (let i = 0; i < 80; i++) {
+    const y = Math.random() * size
+    const height = 1 + Math.random() * 4
+    const alpha = 0.03 + Math.random() * 0.08
+    context.fillStyle = `rgba(255, 255, 255, ${alpha})`
+    context.fillRect(0, y, size, height)
+  }
+
+  for (let i = 0; i < 6500; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const value = 160 + Math.random() * 95
+    const alpha = 0.03 + Math.random() * 0.11
+    context.fillStyle = `rgba(${value}, ${value + 18}, 255, ${alpha})`
+    context.fillRect(x, y, 1, 1)
+  }
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(1.25, 1.25)
+  texture.needsUpdate = true
+  return texture
+}
+
+const ramielTexture = createRamielTexture()
 
 // ==========================================
-// 3. Iluminación (Luces y Sombras)
+// 2. Luces
 // ==========================================
-const ambientLight = new THREE.AmbientLight(0xffffff, lighting.ambientIntensity)
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.55)
 scene.add(ambientLight)
 
-const directionalLight = new THREE.DirectionalLight(0xc9b8ff, lighting.directionalIntensity)
-directionalLight.position.copy(lighting.directionalPosition)
+const directionalLight = new THREE.DirectionalLight(0xc9b8ff, 1.9)
+directionalLight.position.set(3, 5, 3)
 directionalLight.castShadow = true
 directionalLight.shadow.mapSize.width = 1024
 directionalLight.shadow.mapSize.height = 1024
 scene.add(directionalLight)
 
-const glow = new THREE.PointLight(colors.naranja, lighting.pointIntensity, lighting.pointDistance)
+const glow = new THREE.PointLight(COLORS.naranja, 10, 6)
 glow.position.set(0, 0.45, 0)
 scene.add(glow)
 
 // ==========================================
-// 4. Utilidades y Texturas Canvas
+// 3. Geometrías y Materiales (Cumpliendo los 5 materiales)
 // ==========================================
-function lerp(a, b, t) {
-  return a + (b - a) * t
-}
 
-const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
-const limitar = (valor) => Math.min(Math.max(valor, 0), 1)
-
-const crearCanvasTexture = (dibujar, ancho = 128, alto = 128) => {
-  const canvasTexture = document.createElement('canvas')
-  canvasTexture.width = ancho
-  canvasTexture.height = alto
-
-  const contexto = canvasTexture.getContext('2d')
-  dibujar(contexto, ancho, alto)
-
-  const textura = new THREE.CanvasTexture(canvasTexture)
-  textura.needsUpdate = true
-  return textura
-}
-
-const matcapTexture = crearCanvasTexture((contexto, ancho, alto) => {
-  const degradado = contexto.createRadialGradient(
-    ancho * 0.32,
-    alto * 0.28,
-    6,
-    ancho * 0.5,
-    alto * 0.5,
-    ancho * 0.52
-  )
-
-  degradado.addColorStop(0, '#ffffff')
-  degradado.addColorStop(0.18, '#e5d7ff')
-  degradado.addColorStop(0.45, '#8a5cff')
-  degradado.addColorStop(1, '#1a0a33')
-
-  contexto.fillStyle = degradado
-  contexto.fillRect(0, 0, ancho, alto)
-})
-
-const toonTexture = crearCanvasTexture((contexto, ancho, alto) => {
-  const pasos = ['#07050c', '#4b2a7a', '#9dff3c', '#ffffff']
-  const alturaPaso = alto / pasos.length
-
-  for (let i = 0; i < pasos.length; i++) {
-    contexto.fillStyle = pasos[i]
-    contexto.fillRect(0, i * alturaPaso, ancho, alturaPaso)
-  }
-})
-
-toonTexture.magFilter = THREE.NearestFilter
-toonTexture.minFilter = THREE.NearestFilter
-
-// ==========================================
-// 5. Creación de Geometrías, Materiales y Mallas
-// ==========================================
-// Nota de edición rápida: aquí cambias el tamaño y la forma de cada pieza.
-// - pedestal: usa 'objects.pedestalRadiusTop / Bottom / Height' para cambiar altura y ancho del pedestal.
-// - nucleo: usa 'objects.nucleusScale' y 'objects.nucleusY' para mover y escalar la esfera central.
-// - ramiel: usa 'new THREE.OctahedronGeometry(0.55)' y 'objects.ramielScaleY' para cambiar su altura y proporción.
-// - anillos: usa 'datosAnillos[]' y 'ringRadiusA/B/C' para redondear o alargar el AT Field.
-// - portal: usa 'objects.portalRadius' y el scale del objeto para hacer el portal más grande o más pequeño.
-// - partículas: usa 'objects.particleCount' y 'new THREE.SphereGeometry(0.035, 12, 12)' para cambiar la densidad y tamaño de los electrones.
-
-const createMesh = (geometry, material, config = {}) => {
-  const mesh = new THREE.Mesh(geometry, material)
-
-  if (config.position) {
-    mesh.position.set(config.position.x, config.position.y, config.position.z)
-  }
-
-  if (config.rotation) {
-    mesh.rotation.set(config.rotation.x, config.rotation.y, config.rotation.z)
-  }
-
-  if (config.scale) {
-    mesh.scale.set(config.scale.x, config.scale.y, config.scale.z)
-  }
-
-  mesh.castShadow = Boolean(config.castShadow)
-  mesh.receiveShadow = Boolean(config.receiveShadow)
-
-  return mesh
-}
-
-// Suelo base: cambia la textura/forma del piso desde aquí.
-const floor = createMesh(
+// --- MATERIAL 1: MeshStandardMaterial (Suelo, Pedestal, Monolitos y Ramiel) ---
+const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(30, 30),
-  new THREE.MeshStandardMaterial({
-    color: sceneSettings.floorColor,
-    roughness: 0.8,
-    metalness: 0.1
-  }),
-  {
-    position: { x: 0, y: -1, z: 0 },
-    rotation: { x: -Math.PI / 2, y: 0, z: 0 },
-    receiveShadow: true
-  }
+  new THREE.MeshStandardMaterial({ color: COLORS.suelo, roughness: 0.8, metalness: 0.1 })
 )
+floor.rotation.x = -Math.PI / 2
+floor.position.y = -1
+floor.receiveShadow = true
 scene.add(floor)
 
-// Grid: cambia la intensidad visual del suelo con GridHelper size / colors.
-const grid = new THREE.GridHelper(30, 30, colors.naranja, 0x2a1a45)
+const grid = new THREE.GridHelper(30, 30, COLORS.naranja, 0x2a1a45)
 grid.position.y = -0.995
 scene.add(grid)
 
-// Pedestal: ajustar base principal del montaje.
-const pedestal = createMesh(
-  new THREE.CylinderGeometry(
-    objects.pedestalRadiusTop,
-    objects.pedestalRadiusBottom,
-    objects.pedestalHeight,
-    6
-  ),
-  new THREE.MeshStandardMaterial({
-    color: colors.base,
-    roughness: 0.4,
-    metalness: 0.3
-  }),
-  {
-    position: { x: 0, y: objects.pedestalY, z: 0 },
-    castShadow: true,
-    receiveShadow: true
-  }
-)
-scene.add(pedestal)
+// Pedestal por Niveles
+const pedestalMaterial = new THREE.MeshStandardMaterial({ color: COLORS.base, roughness: 0.4, metalness: 0.3 })
 
-// Aro del pedestal: cambias grosor, radio y rotación aquí.
-const aroPedestal = createMesh(
-  new THREE.TorusGeometry(0.9, 0.02, 8, 6),
-  new THREE.MeshBasicMaterial({ color: colors.naranja }),
-  {
-    position: { x: 0, y: -0.59, z: 0 },
-    rotation: { x: Math.PI / 2, y: 0, z: Math.PI / 6 }
-  }
+const pedestalSuperior = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.0, 0.3, 6), pedestalMaterial)
+pedestalSuperior.position.y = -0.65
+pedestalSuperior.castShadow = true
+pedestalSuperior.receiveShadow = true
+
+const pedestalMedio = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.2, 6), pedestalMaterial)
+pedestalMedio.position.y = -0.8
+pedestalMedio.castShadow = true
+pedestalMedio.receiveShadow = true
+
+const pedestalInferior = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 0.15, 6), pedestalMaterial)
+pedestalInferior.position.y = -0.925
+pedestalInferior.castShadow = true
+pedestalInferior.receiveShadow = true
+
+scene.add(pedestalSuperior, pedestalMedio, pedestalInferior)
+
+// Monolitos de fondo
+const numMonolitos = 5
+const radioSemicirculo = 4.8
+const monolitoMaterial = new THREE.MeshStandardMaterial({ color: COLORS.base, roughness: 0.5, metalness: 0.2 })
+
+for (let i = 0; i < numMonolitos; i++) {
+  const angle = -Math.PI * 5 / 6 + (i / (numMonolitos - 1)) * (Math.PI * 2 / 3)
+  const x = Math.cos(angle) * radioSemicirculo
+  const z = Math.sin(angle) * radioSemicirculo
+
+  const monolito = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.0, 0.4), monolitoMaterial)
+  monolito.position.set(x, 1.0, z)
+  monolito.lookAt(0, 1.0, 0)
+  monolito.castShadow = true
+  monolito.receiveShadow = true
+  scene.add(monolito)
+}
+
+// Objeto Principal (Ramiel)
+const ramielGeometry = new THREE.OctahedronGeometry(0.55)
+const ramielMaterial = new THREE.MeshStandardMaterial({
+  color: COLORS.azul,
+  map: ramielTexture,
+  emissive: 0x0d234f,
+  roughness: 0.25,
+  metalness: 0.6,
+  flatShading: true
+})
+
+const ramiel = new THREE.Mesh(ramielGeometry, ramielMaterial)
+ramiel.position.y = 0.45
+ramiel.scale.set(1, 1.5, 1)
+ramiel.castShadow = true
+
+// --- MATERIAL 2: MeshBasicMaterial (Aro, Portal, Aristas y Shockwave) ---
+const aroPedestal = new THREE.Mesh(
+  new THREE.TorusGeometry(0.8, 0.02, 8, 6),
+  new THREE.MeshBasicMaterial({ color: COLORS.naranja })
 )
+aroPedestal.position.set(0, -0.49, 0)
+aroPedestal.rotation.set(Math.PI / 2, 0, Math.PI / 6)
 scene.add(aroPedestal)
 
-// Núcleo central: se usa para darle peso visual al centro del pedestal.
-const nucleo = createMesh(
-  new THREE.IcosahedronGeometry(objects.nucleusScale, 1),
-  new THREE.MeshMatcapMaterial({ matcap: matcapTexture }),
-  {
-    position: { x: 0, y: objects.nucleusY, z: 0 },
-    castShadow: true
-  }
+const portal = new THREE.Mesh(
+  new THREE.TorusGeometry(2.2, 0.025, 8, 6),
+  new THREE.MeshBasicMaterial({ color: COLORS.naranja })
 )
-scene.add(nucleo)
+portal.position.set(0, 0.905, -2.5)
+scene.add(portal)
 
-// Ramiel: cambiar la geometría o la altura por aquí.
-const ramielGeometry = new THREE.OctahedronGeometry(0.55)
-
-const ramiel = createMesh(
-  ramielGeometry,
-  new THREE.MeshStandardMaterial({
-    color: colors.morado,
-    emissive: 0x1a0a33,
-    roughness: 0.25,
-    metalness: 0.6,
-    flatShading: true
-  }),
-  {
-    position: { x: 0, y: motion.ramielYBase, z: 0 },
-    scale: { x: 1, y: objects.ramielScaleY, z: 1 },
-    castShadow: true
-  }
-)
-
-// Bordes del modelo: si quieres líneas más gruesas o más pequeñas, cambia EdgesGeometry y LineBasicMaterial.
 const aristas = new THREE.LineSegments(
   new THREE.EdgesGeometry(ramielGeometry),
-  new THREE.LineBasicMaterial({ color: colors.verde })
+  new THREE.LineBasicMaterial({ color: COLORS.verde })
 )
 ramiel.add(aristas)
 scene.add(ramiel)
 
-// AT Field: ajustar radio y velocidad de cada anillo.
+const shockwave = new THREE.Mesh(
+  new THREE.RingGeometry(0.2, 0.4, 32),
+  new THREE.MeshBasicMaterial({ color: COLORS.verde, transparent: true, opacity: 0, side: THREE.DoubleSide })
+)
+shockwave.rotation.x = -Math.PI / 2
+shockwave.position.y = -0.98
+scene.add(shockwave)
+
+// --- MATERIAL 3: MeshPhongMaterial (Anillos de energía) ---
 const datosAnillos = [
-  { radio: objects.ringRadiusA, color: colors.verde, velocidad: 0.5 },
-  { radio: objects.ringRadiusB, color: colors.naranja, velocidad: -0.3 },
-  { radio: objects.ringRadiusC, color: colors.lila, velocidad: 0.2 }
+  { radio: 1.5, color: COLORS.verde, velocidad: 0.5 },
+  { radio: 2.0, color: COLORS.naranja, velocidad: -0.3 },
+  { radio: 2.5, color: COLORS.lila, velocidad: 0.2 }
 ]
 
-const anillos = []
-
-for (let i = 0; i < datosAnillos.length; i++) {
-  const dato = datosAnillos[i]
-
-  const mesh = createMesh(
+const anillos = datosAnillos.map((dato) => {
+  const mesh = new THREE.Mesh(
     new THREE.TorusGeometry(dato.radio, 0.012, 8, 6),
-    new THREE.MeshPhongMaterial({
-      color: dato.color,
-      shininess: 100,
-      specular: 0xffffff
-    }),
-    {
-      position: { x: 0, y: 0.45, z: 0 },
-      rotation: { x: Math.PI / 2, y: 0, z: 0 },
-      scale: { x: motion.ringScaleStart, y: motion.ringScaleStart, z: motion.ringScaleStart }
-    }
+    new THREE.MeshPhongMaterial({ color: dato.color, shininess: 100 })
   )
-
+  mesh.position.y = 0.45
+  mesh.rotation.x = Math.PI / 2
   scene.add(mesh)
-  anillos.push({ mesh, velocidad: dato.velocidad })
-}
-
-// Portal: cambiar tamaño, grosor y posición del ring central.
-const portal = createMesh(
-  new THREE.TorusGeometry(objects.portalRadius, 0.025, 8, 6),
-  new THREE.MeshBasicMaterial({ color: colors.naranja }),
-  {
-    position: { x: 0, y: 0.905, z: -2.5 },
-    scale: { x: motion.portalScaleStart, y: motion.portalScaleStart, z: motion.portalScaleStart }
-  }
-)
-scene.add(portal)
-
-// Partículas / electrones flotantes: cambiar densidad, tamaño y radio orbital.
-const particulas = []
-const materialParticula = new THREE.MeshToonMaterial({
-  color: colors.verde,
-  gradientMap: toonTexture
+  return { mesh, velocidad: dato.velocidad }
 })
 
-for (let i = 0; i < objects.particleCount; i++) {
-  const particula = createMesh(
-    new THREE.SphereGeometry(0.035, 12, 12),
-    materialParticula.clone(),
-    {
-      position: {
-        x: Math.cos((i / objects.particleCount) * Math.PI * 2) * 0.85,
-        y: 0.1 + (i % 2) * 0.08,
-        z: Math.sin((i / objects.particleCount) * Math.PI * 2) * 0.85
-      }
-    }
-  )
+// --- MATERIAL 4: MeshMatcapMaterial (Núcleo Central) ---
+// Carga la textura matcap desde la fuente oficial de ejemplos de Three.js
+const matcapTexture = textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/matcaps/matcap-porcelain-white.jpg')
 
-  scene.add(particula)
+const nucleo = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(0.18, 1),
+  new THREE.MeshMatcapMaterial({ matcap: matcapTexture, color: COLORS.lila })
+)
+nucleo.position.y = 1.5
+nucleo.castShadow = true
+scene.add(nucleo)
+
+// --- MATERIAL 5: MeshToonMaterial (Partículas) ---
+const particulas = []
+const numParticulas = 8
+
+for (let i = 0; i < numParticulas; i++) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.035, 12, 12),
+    new THREE.MeshToonMaterial({ color: COLORS.verde })
+  )
+  scene.add(mesh)
   particulas.push({
-    mesh: particula,
-    angulo: (i / objects.particleCount) * Math.PI * 2,
-    radio: 0.85,
-    velocidad: 0.8 + i * 0.08,
-    altura: 0.1 + (i % 2) * 0.08
+    mesh,
+    angulo: (i * Math.PI * 2) / numParticulas
   })
 }
 
 // ==========================================
-// 6. Interacción y Eventos (Raycaster, Clic, Teclado, Resize)
+// 4. Importación de Modelo 3D Externo (GLTFLoader)
 // ==========================================
-// Raycaster: cambia 'raycaster.intersectObject(ramiel)' para apuntar a otra malla si vas a detectar otra geometría.
-// Teclado: cambia 'interaction.activationKey' en SETTINGS para usar otra tecla de activación.
-const puntero = { x: 0, y: 0 }
+const gltfLoader = new GLTFLoader()
+let modeloImportado = null
+
+// Coloca tu archivo .glb dentro de la carpeta /public o en la raíz de tu servidor
+gltfLoader.load(
+  './modelo.glb', // Reemplaza por la ruta de tu modelo 3D
+  (gltf) => {
+    modeloImportado = gltf.scene
+    modeloImportado.position.set(0, 2.2, 0)
+    modeloImportado.scale.set(0.4, 0.4, 0.4)
+    
+    // Configurar sombras para las mallas del modelo importado
+    modeloImportado.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true
+        child.receiveShadow = true
+      }
+    })
+    
+    scene.add(modeloImportado)
+  },
+  undefined,
+  (error) => {
+    console.log('Nota: Agrega tu archivo modelo.glb a la carpeta para visualizar el objeto importado.')
+  }
+)
+
+// ==========================================
+// 5. Eventos e Interacción (Raycaster & GSAP)
+// ==========================================
 const raycaster = new THREE.Raycaster()
 const mouse = new THREE.Vector2()
 let alerta = false
 
-const toggleAlerta = () => {
+function toggleAlerta() {
   alerta = !alerta
 
-  const colorObjetivo = new THREE.Color(alerta ? colors.alerta : colors.morado)
-  const colorAristas = new THREE.Color(alerta ? colors.naranja : colors.verde)
-  const colorGlow = new THREE.Color(alerta ? colors.alerta : colors.naranja)
+  // Prevenir interrupciones de animación en clics rápidos
+  gsap.killTweensOf(ramiel.scale)
+  gsap.killTweensOf(shockwave.scale)
+  gsap.killTweensOf(shockwave.material)
 
-  // GSAP de escala: esto da el golpe de “sacudida” del objeto principal.
+  // Animación de escala de Ramiel
   gsap.to(ramiel.scale, {
     x: 1.2,
     y: 1.8,
     z: 1.2,
     duration: 0.25,
     yoyo: true,
-    repeat: 1,
-    ease: 'power2.out'
+    repeat: 1
   })
 
-  // GSAP de color: si cambias duration o ease, controlas la velocidad y suavidad del cambio de estado.
-  gsap.to(ramiel.material.color, {
-    r: colorObjetivo.r,
-    g: colorObjetivo.g,
-    b: colorObjetivo.b,
-    duration: 0.35,
-    ease: 'power2.out'
-  })
+  // Animación de la onda expansiva (Shockwave)
+  shockwave.material.color.setHex(alerta ? COLORS.alerta : COLORS.verde)
+  shockwave.scale.set(0.1, 0.1, 0.1)
+  shockwave.material.opacity = 0.8
+  
+  gsap.to(shockwave.scale, { x: 15, y: 15, z: 15, duration: 0.7, ease: 'power2.out' })
+  gsap.to(shockwave.material, { opacity: 0, duration: 0.7, ease: 'power2.out' })
 
-  gsap.to(aristas.material.color, {
-    r: colorAristas.r,
-    g: colorAristas.g,
-    b: colorAristas.b,
-    duration: 0.35,
-    ease: 'power2.out'
-  })
-
-  gsap.to(glow.color, {
-    r: colorGlow.r,
-    g: colorGlow.g,
-    b: colorGlow.b,
-    duration: 0.35,
-    ease: 'power2.out'
-  })
+  // Cambios cromáticos
+  ramiel.material.color.setHex(alerta ? COLORS.alerta : COLORS.azul)
+  aristas.material.color.setHex(alerta ? COLORS.naranja : COLORS.verde)
+  glow.color.setHex(alerta ? COLORS.alerta : COLORS.naranja)
 }
 
-window.addEventListener('pointermove', (e) => {
-  puntero.x = (e.clientX / window.innerWidth) * 2 - 1
-  puntero.y = (e.clientY / window.innerHeight) * 2 - 1
-})
-
-canvas.addEventListener('click', (event) => {
+canvas.addEventListener('click', (e) => {
   const rect = canvas.getBoundingClientRect()
-
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-  mouse.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1)
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+  mouse.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
 
   raycaster.setFromCamera(mouse, camera)
+  const intersects = raycaster.intersectObject(ramiel)
 
-  const intersecciones = raycaster.intersectObject(ramiel)
-
-  if (intersecciones.length > 0) {
-    toggleAlerta()
-  }
+  if (intersects.length > 0) toggleAlerta()
 })
 
-window.addEventListener('keydown', (event) => {
-  if (event.code === interaction.activationKey) {
-    event.preventDefault()
-    toggleAlerta()
-  }
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') toggleAlerta()
 })
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
-
   renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, rendererSettings.pixelRatioMax))
 })
 
 // ==========================================
-// 7. Lógica de Estado y Animaciones GSAP
+// 6. Bucle de Animación Estándar (#c-raf)
 // ==========================================
-// Cambia aquí los tiempos generales del comportamiento en estado de alerta o intro.
-const DURACION_INTRO = motion.introDuration
-const inicio = performance.now()
+const clock = new THREE.Clock()
 
-let anterior = null
-let flotacion = 0
-let objetivoFlotacion = motion.floatAmplitude
-let velocidadActual = 1
+const tick = () => {
+  const delta = clock.getDelta()
+  const elapsedTime = clock.getElapsedTime()
+  const speed = alerta ? 3 : 1
 
-// ==========================================
-// 8. Bucle de Animación Principal (tick)
-// ==========================================
-const tick = (ahora) => {
-  requestAnimationFrame(tick)
+  // 1. Flotación constante + Rotación de Ramiel
+  ramiel.position.y = 0.45 + Math.sin(elapsedTime * 2) * 0.08
+  ramiel.rotation.y += 0.6 * speed * delta
 
-  // delta = tiempo real entre frames para una animación estable y uniforme.
-  // Si quieres más lenta o más rápida la animación global, ajusta 'delta' o las velocidades del ánimo.
-  if (anterior === null) {
-    anterior = ahora
-    return
+  // 2. Rotación de Anillos
+  anillos.forEach((anillo) => {
+    anillo.mesh.rotation.z += anillo.velocidad * speed * delta
+  })
+
+  // 3. Órbita de Partículas
+  particulas.forEach((p, index) => {
+    p.angulo += 0.8 * speed * delta
+    p.mesh.position.x = Math.cos(p.angulo) * 0.85
+    p.mesh.position.z = Math.sin(p.angulo) * 0.85
+    p.mesh.position.y = 0.1 + Math.sin(elapsedTime * 3 + index) * 0.05
+    p.mesh.rotation.y += 2.5 * delta
+  })
+
+  // 4. Rotación del Portal y del Modelo Importado (si existe)
+  portal.rotation.z += 0.1 * delta
+
+  if (modeloImportado) {
+    modeloImportado.rotation.y += 0.5 * delta
+    modeloImportado.position.y = 2.2 + Math.sin(elapsedTime * 1.5) * 0.05
   }
 
-  const delta = (ahora - anterior) / 1000
-  anterior = ahora
-
-  // t = progreso de la intro, de 0 a 1, para que Ramiel y el portal entren con easing suave.
-  const t = Math.min((ahora - inicio) / DURACION_INTRO, 1)
-
-  // alturaBase = sube a Ramiel desde el pedestal con easing tipo cubic-out.
-  const alturaBase = lerp(motion.ramielYBase, motion.ramielYIntro, easeOutCubic(t))
-
-  // flotación continua tras la intro, alternando amplitud para crear un movimiento de balanceo.
-  if (t >= 1) {
-    flotacion = lerp(flotacion, objetivoFlotacion, delta * motion.floatLerp)
-
-    if (objetivoFlotacion > 0 && flotacion > objetivoFlotacion - 0.02) {
-      objetivoFlotacion = -motion.floatAmplitude
-    } else if (objetivoFlotacion < 0 && flotacion < objetivoFlotacion + 0.02) {
-      objetivoFlotacion = motion.floatAmplitude
-    }
-  }
-
-  // Ramiel: cambia su altura para entrar desde el pedestal y luego flotar.
-  ramiel.position.y = alturaBase + flotacion
-
-  // velocidadObjetivo = cambia de inactiva a alerta, manteniendo respuesta del giro del objeto.
-  const velocidadObjetivo = alerta ? motion.alertRotationSpeed : motion.idleRotationSpeed
-  velocidadActual = lerp(velocidadActual, velocidadObjetivo, delta * 2)
-
-  // giro y inclinación del modelo principal: aporta sensación de vida y respuesta al mouse.
-  ramiel.rotation.y = ramiel.rotation.y + 0.6 * velocidadActual * delta
-  ramiel.rotation.x = lerp(ramiel.rotation.x, puntero.y * interaction.moveSensitivityY, delta * 3)
-  ramiel.rotation.z = lerp(ramiel.rotation.z, -puntero.x * interaction.moveSensitivityX, delta * 3)
-
-  // anillos AT Field: se abren con escalado gradual; cada uno tiene distinta velocidad.
-  for (let i = 0; i < anillos.length; i++) {
-    const anillo = anillos[i]
-
-    const tAnillo = limitar((t - i * 0.15) / 0.55)
-    const escala = lerp(motion.ringScaleStart, motion.ringScaleEnd, easeOutCubic(tAnillo))
-    anillo.mesh.scale.set(escala, escala, escala)
-
-    anillo.mesh.rotation.z = anillo.mesh.rotation.z + anillo.velocidad * velocidadActual * delta
-    anillo.mesh.rotation.x = lerp(anillo.mesh.rotation.x, Math.PI / 2 + puntero.y * 0.25, delta * 3)
-  }
-
-  // partículas flotantes = orbitan alrededor del núcleo usando sine para moverse de forma orgánica.
-  for (let i = 0; i < particulas.length; i++) {
-    const particula = particulas[i]
-    particula.angulo += particula.velocidad * delta
-    particula.mesh.position.x = Math.cos(particula.angulo) * particula.radio
-    particula.mesh.position.z = Math.sin(particula.angulo) * particula.radio
-    particula.mesh.position.y = particula.altura + Math.sin(ahora * 0.002 + i) * 0.05
-    particula.mesh.rotation.y += delta * 2.5
-  }
-
-  // portal = aparece al final de la intro; funciona como fondo de la composición.
-  const tPortal = limitar((t - 0.3) / 0.7)
-  const escalaPortal = lerp(motion.portalScaleStart, motion.portalScaleEnd, easeOutCubic(tPortal))
-  portal.scale.set(escalaPortal, escalaPortal, escalaPortal)
-
-  // resplandor sigue a Ramiel y cambia de color con la alerta; si quieres brillo mayor, sube 'lighting.pointIntensity'.
+  // 5. El punto de luz sigue la flotación de Ramiel
   glow.position.y = ramiel.position.y
 
+  // 6. Actualizar controles y renderizar
   controls.update()
   renderer.render(scene, camera)
+
+  requestAnimationFrame(tick)
 }
 
-requestAnimationFrame(tick)
+tick()
